@@ -1,0 +1,248 @@
+<style>
+body {
+	background: black;
+	color: white;
+	overflow: hidden;
+}
+body.nocursor { 
+	cursor: none;
+}
+#status {
+	position: absolute;
+	z-index: 99;
+}
+canvas {
+	position: absolute;
+	top: 0;
+	left: 0;
+	opacity: 0;
+	transition: 1s;
+}
+</style>
+<body class="nocursor">
+<div id="status"></div>
+<script>
+const SPEED_ADJUST = 0.1
+
+canvas = document.createElement('canvas')
+canvas.width = screen.width
+canvas.height = screen.height
+document.body.appendChild(canvas)
+ctx = canvas.getContext('2d')
+
+filters = [ 'source-over', 'difference', 'difference', 'difference', 'color', 'overlay', 'color-dodge', 'overlay', 'overlay', 'multiply' ]
+files = [ 'timeish1.png', 'timeish2.png', 'timeish3.png', 'timeish4.png', '#ACC1D9', 'timeish6.png', 'timeish7.png', '#1D3677', 'timeish9.png', 'timeish10.png' ]
+
+var logsize = 10, eventlog = [], eventtimers = []
+function log(msg) {
+	let stat = document.querySelector('#status')
+	if (msg === null) {
+		eventlog = []
+		eventtimers.forEach(t => clearTimeout(t))
+		stat.innerHTML = ''
+	} else {
+		eventlog.push(msg)
+		stat.innerHTML = eventlog.slice(-logsize).join('<br>')
+		
+		eventtimers.push(setTimeout(function () {
+			eventlog.shift()
+			stat = document.querySelector('#status')
+			stat.innerHTML = eventlog.slice(-logsize).join('<br>')
+		}, 5000))
+	}
+}
+
+var speeds = {
+	stop : function () {
+		log(null)
+		log('<b>Stop</b>')
+		for (let i = 0; i < layers.length-1; i++) {
+		<!-- for (let i = layers.length-1; i >= 0; i--) { -->
+			layers[i].twist = 0
+			layers[i].degree = 0
+		}
+	},
+	default : function () {
+		log(null)
+		log('<b>Default twist speeds:</b>')
+		let twist = 0
+		for (let i = 0; i < layers.length-1; i++) {
+		<!-- for (let i = layers.length-1; i >= 0; i--) { -->
+			if (layers[i].noTwist) continue
+			layers[i].twist = twist
+			twist += SPEED_ADJUST/5
+			log(`- Layer ${i}: ${layers[i].twist.toFixed(2)}`)
+		}
+	},
+	random : function () {
+		log(null)
+		log('<b>All random twist speeds:</b>')
+		for (let i = 0; i < layers.length-1; i++) {
+		<!-- for (let i = layers.length-1; i >= 0; i--) { -->
+			if (layers[i].noTwist) continue
+			layers[i].twist = Math.random()*2-1
+			log(`- Layer ${i}: ${layers[i].twist.toFixed(2)}`)
+		}
+	},
+	up : function () {
+		log(null)
+		log('<b>All speeds up:</b>')
+		for (let i = 0; i < layers.length-1; i++) {
+		<!-- for (let i = layers.length-1; i >= 0; i--) { -->
+			if (layers[i].noTwist) continue
+			layers[i].twist += SPEED_ADJUST
+			log(`- Layer ${i}: ${layers[i].twist.toFixed(2)}`)
+		}
+	},
+	down : function () {
+		log(null)
+		log('<b>All speeds down:</b>')
+		for (let i = 0; i < layers.length-1; i++) {
+		<!-- for (let i = layers.length-1; i >= 0; i--) { -->
+			if (layers[i].noTwist) continue
+			layers[i].twist -= SPEED_ADJUST
+			log(`- Layer ${i}: ${layers[i].twist.toFixed(2)}`)
+		}
+	}
+}
+
+var cursorTimer
+document.body.addEventListener('mousemove', function () {
+	document.body.classList.remove('nocursor')
+	clearTimeout(cursorTimer)
+	cursorTimer = setTimeout(function () {
+		document.body.classList.add('nocursor')
+	}, 1000)
+})
+
+document.body.addEventListener('keydown', function (event) {
+	<!-- if (event.repeat) return -->
+	switch (event.code) {
+		case 'Backspace':
+			speeds.default()
+			break
+		case 'Escape':
+			speeds.stop()
+			break
+		case 'Space':
+			speeds.random()
+			break
+		default:
+			if (event.code.indexOf('Digit') === 0) {
+				let digit = Number(event.code[5])
+				for (let i=0;i<layers.length-1;i++) {
+					if (digit == i) {
+						if (layers[i].noTwist) {
+							log(`No twist on layer ${i} (${layers[i].file})`)
+						} else {
+							let SPDADJ = SPEED_ADJUST
+							if (event.ctrlKey) SPDADJ/=10
+							if (event.shiftKey) {
+								layers[i].twist -= SPDADJ
+								log(`Layer ${i} speed down: ${layers[i].twist.toFixed(2)} (${layers[i].file})`)
+							} else {
+								layers[i].twist += SPDADJ
+								log(`Layer ${i} speed up: ${layers[i].twist.toFixed(2)} (${layers[i].file})`)
+							}
+						}
+						break
+					}
+				}
+			} else {
+				if (!event.repeat) console.log(event.code, event)
+			}
+	}
+})
+
+canvas.addEventListener('mousewheel', function(event) {
+	if (event.deltaY < 0) { // up
+		speeds.up()
+	} else if (event.deltaY > 0) { // down
+		speeds.down()
+	}
+})
+
+canvas.addEventListener('mousedown', function (event) {
+	//console.log(event.which)
+	switch (event.which) {
+		case 1: // left
+			speeds.default()
+			break
+		case 2: // middle
+			speeds.random()
+			event.preventDefault()
+			break
+		case 3: // right
+	}
+})
+
+<!-- canvas.addEventListener('contextmenu', function() { event.preventDefault() }) -->
+
+
+layers = files.slice()
+for (idx in layers) {
+	if (files[idx][0] == '#') {
+		layers[idx] = document.createElement('canvas')
+		layers[idx].width = 2000
+		layers[idx].height = 2000
+		layers[idx].ctx = layers[idx].getContext('2d')
+		layers[idx].ctx.fillStyle = files[idx]
+		layers[idx].ctx.fillRect(0, 0, 2000, 2000)
+		layers[idx].noTwist = true
+		layers[idx].isLoaded = true
+	} else {
+		layers[idx] = new Image()
+		layers[idx].isLoaded = false
+		layers[idx].onload = function () {
+			this.isLoaded = true
+			if (layers.every(item => item.isLoaded)) {
+				let stat = document.querySelector('#status')
+				clearInterval(statusTimer)
+				speeds.default()
+				stat.innerHTML = ''
+				drawProc()
+				canvas.style.opacity = '1'
+			}
+		}
+		layers[idx].twist = 0
+		layers[idx].src = files[idx]
+	}
+	layers[idx].file = files[idx]
+	layers[idx].degree = 0
+	layers[idx].filter = filters[idx]
+}
+
+layers[5].noTwist = true
+layers[9].noTwist = true
+
+
+ctx.textBaseline = 'middle'
+ctx.textAlign = 'center'
+
+statusTimer = setInterval(function () {
+	if (!layers.every(item => item.isLoaded)) {
+		let statText = 'Loading images:'
+		layers.forEach(item => {
+			statText += `<br>&nbsp; &middot; ${item.file} [${item.isLoaded ? 'Loaded' : 'Loading'}]`
+		})
+		document.querySelector('#status').innerHTML = statText
+	}
+}, 100)
+
+function drawProc() {
+	for (idx in layers) {
+		ctx.globalCompositeOperation = layers[idx].filter
+		layers[idx].degree+=layers[idx].twist
+		drawImage(layers[idx], canvas.width/2, canvas.height/2, 1, layers[idx].degree*Math.PI/180)
+	}
+	requestAnimationFrame(drawProc)
+}
+
+
+function drawImage(image, x, y, scale, rotation){
+	ctx.setTransform(scale, 0, 0, scale, x, y) // sets scale and origin
+	if (!image.noTwist) ctx.rotate(rotation)
+    ctx.drawImage(image, -image.width / 2, -image.height / 2)
+} 
+
+</script>
